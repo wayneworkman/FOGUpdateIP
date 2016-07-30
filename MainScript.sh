@@ -36,6 +36,7 @@ checkCommand() {
         exit 1
     fi
 }
+
 #---- Check command variables required ----#
 checkCommand "$grep" "grep" "$log"
 checkCommand "$awk" "awk" "$log"
@@ -53,34 +54,31 @@ $echo -------------------- >> $log
 $echo $NOW >> $log
 $echo -------------------- >> $log
 
-
-
-#check for .fogsettings existence, if it isn't there, exit the script.
-if ! [[ -f $fogsettings ]]; then
-        $echo The file $fogsettings does not exist, exiting. >> $log
-        exit
+# Check fogsettings existence
+if [[ ! -f $fogsettings ]]; then
+    $echo "The file $fogsettings does not exist, exiting" >> $log
+    exit
 fi
 
+# Function checks if the variables needed are set
+# Parameter 1 is the variable to test
+# Parameter 2 is what the variable is testing for (msg string)
+# Parameter 3 is the config file (msg string)
+# Parameter 4 is the log file to write to
+checkFogSettingVars() {
+    local var="$1"
+    local msg="$2"
+    local cfg="$3"
+    local log="$4"
+    if [[ -z $var ]]; then
+        echo "The $msg setting inside $cfg is not set, cannot continue, exiting" >> $log
+        exit 2
+    fi
+}
+. $fogsettings
 
-
-#---- Get interface name and last IP from .fogsettings ---#
-
-interface="$($grep 'interface=' $fogsettings | $cut -d \' -f2 )"
-fogsettingsIP="$($grep 'ipaddress=' $fogsettings | $cut -d \' -f2 )"
-
-#Check if the interface setting is good.
-if [[ -z $interface ]]; then
-	$echo The interface setting inside $fogsettings either doesn't exist or isn't as expected, exiting. >> $log
-	exit
-fi
-
-#Check if the ipaddress setting is good.
-if [[ -z $fogsettingsIP ]]; then
-	$echo The ipaddress setting inside $fogsettings either doesn't exist or isn't as expected, exiting. >> $log
-	exit
-fi
-
-
+checkFogSettingVars "$interface" "interface" "$fogsettings" "$log"
+checkFogSettingVars "$ipaddress" "ipaddress" "$fogsettings" "$log"
 
 #---- Wait for an IP address ----#
 

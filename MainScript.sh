@@ -156,49 +156,27 @@ if [[ $ip != $ipaddress ]]; then
 		touch $customfogsettings
 	fi
 
-    if ! $grep -q dodnsmasq "$customfogsettings": then
+    checkFilePresence "$customfogsettings" "$log"
+
+    # Source custom fogsettings
+    . $customfogsettings
+    if [[ -z $dodnsmasq ]]; then
+        $echo "The dodnsmasq setting was not found in $customfogsettings, adding it." >> $log
+        # Add dodnsmasq setting
+        $echo "dodnsmasq='1'" >> $customfogsettings
     fi
-
-	#Check if the dodnsmasq setting exists in $customfogsettings If not, create it and set it to true.
-	if ! $grep -q dodnsmasq "$customfogsettings"; then
-		$echo The dodnsmasq setting was not found in $customfogsettings, adding it. >> $log
-		#Remove any blank lines at the end of customfogsettings, then rewrite file.
-		$sed -e :a -e '/^\n*$/{$d;N;};/\n$/ba' $customfogsettings > $customfogsettings.new
-		$mv $customfogsettings.new $customfogsettings
-		#Add dodnsmasq setting.
-		$echo "dodnsmasq='1'" >> $customfogsettings
-		#Add a blank line at the end of customfogsettings.
-		$echo "" >> $customfogsettings
-	fi
-
-
-	#Check if the bldnsmasq setting exists in $customfogsettings. If not, create it and set it to true.
-	if ! grep -q bldnsmasq "$customfogsettings"; then
-		$echo The bldnsmasq setting was not found in $customfogsettings, adding it. >> $log
-		#Remove any blank lines at the end of customfogsettings, then rewrite file.
-                $sed -e :a -e '/^\n*$/{$d;N;};/\n$/ba' $customfogsettings > $customfogsettings.new
-		$mv $customfogsettings.new $customfogsettings
-                #Add bldnsmasq setting.
+    if [[ -z $bldnsmasq ]]; then
+        $cho "The bldnsmasq setting was not found in $customfogsettings, adding it." >> $log
+        # Add bldnsmasq
 		$echo "bldnsmasq='1'" >> $customfogsettings
-		#Add a blank line at the end of customfogsettings.
-                $echo "" >> $customfogsettings
 	fi
+    # Resource both settings files
+    . $fogsettings
+    . $customfogsettings
 
-
-	#Read the dodnsmasq and bldnsmasq settings.
-	dodnsmasq="$($grep 'dodnsmasq=' $fogsettings | $cut -d \' -f2 )"
-	bldnsmasq="$($grep 'bldnsmasq=' $fogsettings | $cut -d \' -f2 )"
-
-	#If either of the dnsmasq fogsettings are empty, exit the script.
-	if [[ -z dodnsmasq ]]; then
-		$echo The dodnsmasq setting in $customfogsettings either doesn't exist or isn't as expected, exiting the script. >> $log
-		exit
-	fi
-
-	if [[ -z bldnsmasq ]]; then
-		$echo The bldnsmasq setting in $customfogsettings either doesn't exist or isn't as expected, exiting the script. >> $log
-		exit
-	fi
+    # Verify dodnsmasq and bldnsmasq are indeed set
+    checkFogSettingVars "$dodnsmasq" 'dodnsmasq' "$fogsettings or $customfogsettings" "$log"
+    checkFogSettingVars "$bldnsmasq" 'bldnsmasq' "$fogsettings or $customfogsettings" "$log"
 
 	#If bldnsmasq is seto as 1, build the config file.
 	if [[ "$bldnsmasq" == "1" ]]; then

@@ -289,20 +289,20 @@ if [[ "$IP" != "$fogsettingsIP" ]]; then
 	fi
 
 
-	#Check if the dodnsmasq setting exists in $customfogsettings If not, create it and set it to false.
+	#Check if the dodnsmasq setting exists in $customfogsettings If not, create it and set it to true.
 	if ! $grep -q dodnsmasq "$customfogsettings"; then
 		$echo The dodnsmasq setting was not found in $customfogsettings, adding it. >> $log
 		#Remove any blank lines at the end of customfogsettings, then rewrite file.
 		$sed -e :a -e '/^\n*$/{$d;N;};/\n$/ba' $customfogsettings > $customfogsettings.new
 		$mv $customfogsettings.new $customfogsettings
 		#Add dodnsmasq setting.
-		$echo "dodnsmasq='0'" >> $customfogsettings
+		$echo "dodnsmasq='1'" >> $customfogsettings
 		#Add a blank line at the end of customfogsettings.
 		$echo "" >> $customfogsettings
 	fi
 	
 
-	#Check if the bldnsmasq setting exists in $customfogsettings. If not, create it and set it to false.
+	#Check if the bldnsmasq setting exists in $customfogsettings. If not, create it and set it to true.
 	if ! grep -q bldnsmasq "$customfogsettings"; then
 		$echo The bldnsmasq setting was not found in $customfogsettings, adding it. >> $log
 		#Remove any blank lines at the end of customfogsettings, then rewrite file.
@@ -367,7 +367,7 @@ if [[ "$IP" != "$fogsettingsIP" ]]; then
 		$echo dhcp-option=17,/images >> $ltsp
 		$echo dhcp-option=vendor:PXEClient,6,2b >> $ltsp
 		$echo dhcp-no-override >> $ltsp
-		$echo pxe-prompt="Press F8 for boot menu", 1 >> $ltsp
+		$echo pxe-prompt="Press F8 for boot menu", 60 >> $ltsp
 		$echo pxe-service=X86PC, “Boot from network”, undionly >> $ltsp
 		$echo pxe-service=X86PC, "Boot from local hard disk", 0 >> $ltsp
 		$echo dhcp-range=$IP,proxy >> $ltsp

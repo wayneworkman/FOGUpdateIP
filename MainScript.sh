@@ -88,7 +88,7 @@ IFS=$previousIFS
 #---- Check contents of command variables ----#
 	
 if [[ -z $echo ]]; then
-	echo The path for grep was not found, exiting. >> $log
+	echo The path for echo was not found, exiting. >> $log
 	exit
 fi
 

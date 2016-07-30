@@ -6,6 +6,8 @@
 [[ -z $log ]] && log="/opt/fog/log/FOGUpdateIP.log"
 ## Storage Node Name
 [[ -z $storageNode ]] && storageNode="DefaultMember"
+[[ -z $database ]] && database="fog"
+[[ -z $tftpfile ]] && tftpfile="/tftpboot/default.ipxe"
 
 #---- Set Required Command Paths ----#
 grep=$(command -v grep)
@@ -54,11 +56,21 @@ $echo -------------------- >> $log
 $echo $NOW >> $log
 $echo -------------------- >> $log
 
+# Function checks if file is present.
+# Parameter 1 is the file to check for
+# Parameter 2 is the log to write to
+checkFilePresence() {
+    local file="$1"
+    local log="$2"
+    if [[ ! -f $file ]]; then
+        $echo "The file $file does not exist, exiting" >> $log
+        exit 2
+    fi
+}
+
 # Check fogsettings existence
-if [[ ! -f $fogsettings ]]; then
-    $echo "The file $fogsettings does not exist, exiting" >> $log
-    exit
-fi
+checkFilePresence "$fogsettings" "$log"
+checkFilePresence "$tftpfile" "$log"
 
 # Function checks if the variables needed are set
 # Parameter 1 is the variable to test
@@ -77,80 +89,48 @@ checkFogSettingVars() {
 }
 . $fogsettings
 
+# Check our required checks first
 checkFogSettingVars "$interface" "interface" "$fogsettings" "$log"
 checkFogSettingVars "$ipaddress" "ipaddress" "$fogsettings" "$log"
 
 #---- Wait for an IP address ----#
-
-IP=`$ip addr list ${interface} | $grep "inet " |$cut -d" " -f6|$cut -d/ -f1`
-
-while [[ -z $IP ]]
-
-do
-	$echo The IP address for $interface was not found, waiting 5 seconds. >> $log
-	sleep 5
-	IP=`$ip addr list ${interface} | $grep "inet " |$cut -d" " -f6|$cut -d/ -f1`
+while [[ -z $IP ]]; do
+    ip=$($ip -4 addr show $interface | awk -F'[ /]+' '/global/ {print $3}')
+    [[ -n $ip ]] && break
+    $echo "The IP Address for $interface was not found, waiting 5 seconds to test again" >> $log
+    sleep 5
 done
 
+# If the IP from fogsettings doesn't match what the system returned #
+#    Make the change so system can still function #
+if [[ $ip != $ipaddress ]]; then
+    #---- Update the IP Setting ----#
+    $echo "The IP Address for $interface does not match the ipaddress setting in $fogsettings, updating the IP Settings server-wide." >> $log
+    statement1="UPDATE \`globalSettings\` SET \`settingValue\`='$ip' WHERE \`settingKey\` IN ('FOG_TFTP_HOST','FOG_WOL_HOST','FOG_WEB_HOST');"
+    statement2="UPDATE \`nfsGroupMembers\` SET \`ngmHostname\`='$ip' WHERE \'ngmMemberName\`='$storageNode' OR \'ngmHostname\`='$ipaddress';"
+	sqlStatements="$statement1$statement2"
 
-
-
-if [[ "$IP" != "$fogsettingsIP" ]]; then
-#If the interface IP doesn't match the .fogsettings IP, do the below.
-
-
-	#-------------- Update the IP settings --------------#
-
-	$echo The IP address for $interface does not match the ipaddress setting in $fogsettings, updating the IP Settings server-wide. >> $log
-
-	#---- SQL ----#
-
-	snmysqluser="$($grep 'snmysqluser=' $fogsettings | $cut -d \' -f2 )"
-	snmysqlpass="$($grep 'snmysqlpass=' $fogsettings | $cut -d \' -f2 )"
-
-	#These are the SQL statements to run against the DB
-	statement1="UPDATE \`globalSettings\` SET \`settingValue\` = '$IP' WHERE \`settingKey\` ='FOG_TFTP_HOST';"
-	statement2="UPDATE \`globalSettings\` SET \`settingValue\` = '$IP' WHERE \`settingKey\` ='FOG_WOL_HOST';"
-	statement3="UPDATE \`nfsGroupMembers\` SET \`ngmHostname\` = '$IP' WHERE \`ngmMemberName\` ='$storageNode';"
-	statement4="UPDATE \`globalSettings\` SET \`settingValue\` = '$IP' WHERE \`settingKey\` ='FOG_WEB_HOST';"
-
-
-	#This puts all the statements into one variable. If you add more statments above, add the extra ones to this too.
-	sqlStatements=$statement1$statement2$statement3$statement4
-
-
-	#This builds the proper MySQL Connection Statement and runs it.
-	if [ "$snmysqlpass" != "" ]; then
-		#If there is a password set
-		$echo A password was set for snmysqlpass in $fogsettings, using the password. >> $log
-		$mysql --user=$snmysqluser --password=$snmysqlpass --database='fog' -e "$sqlStatements"
-
-	elif [ "$snmysqluser" != "" ]; then
-		#If there is a user set but no password
-		$echo A username was set for snmysqluser in $fogsettings, but no password was found. Using the username. >> $log
-		$mysql --user $snmysqluser --database='fog' -e "$sqlStatements"
-
-	else
-		$echo There was no username or password set for the database in $fogsettings, trying without credentials. >> $log
-		#If there is no user or password set
-		$mysql --database='fog' -e "$sqlStatements"
-	fi
-
-
+    # Builds proper SQL Statement and runs.
+    # If no user defined, assume root
+    [[ -z $snmysqluser ]] && $snmysqluser='root'
+    # If no host defined, assume localhost/127.0.0.1
+    [[ -z $snmysqlhost ]] && $snmysqlhost='127.0.0.1'
+    # No password set, run statement without pass authentication
+    if [[ -z $snmysqlpass ]]; then
+        $echo "A password was not set in $fogsettings for mysql use" >> $log
+        $mysql -u"$snmysqluser" -e "$sqlStatements" "$database" 2>> $log
+    # Else run with password authentication
+    else
+        $echo "A password was set in $fogsettings for mysql use" >> $log
+        $mysql -u"$snmysqluser" -p"${snmysqlpass}" -e "$sqlStatements" "$database" 2>> $log
+    fi
 
 	#---- Update IP address in file default.ipxe ----#
+	$echo "Updating the IP in $tftpfile" >> $log
+	$sed -i "s|http://\([^/]\+\)/|http://$ip/|" $tftpfile
+	$sed -i "s|http:///|http://$ip/|" $tfptfile
 
-	$echo Updating the IP in /tftpboot/default.ipxe >> $log
-	$sed -i "s|http://\([^/]\+\)/|http://$IP/|" /tftpboot/default.ipxe
-	$sed -i "s|http:///|http://$IP/|" /tftpboot/default.ipxe
-
-
-	#---- Backup config.class.php and then updae IP ----#
-
-	#read the docroot and webroot settings.
-	docroot="$($grep 'docroot=' $fogsettings | $cut -d \' -f2 )"
-	webroot="$($grep 'webroot=' $fogsettings | $cut -d \' -f2 )"
-
+	#---- Backup config.class.php and then update IP ----#
 
 	#check if docroot is blank.
 	if [[ -z $docroot ]]; then

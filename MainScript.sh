@@ -84,7 +84,7 @@ checkFogSettingVars() {
     local log="$4"
     if [[ -z $var ]]; then
         echo "The $msg setting inside $cfg is not set, cannot continue, exiting" >> $log
-        exit 2
+        exit 3
     fi
 }
 . $fogsettings
@@ -130,40 +130,34 @@ if [[ $ip != $ipaddress ]]; then
 	$sed -i "s|http://\([^/]\+\)/|http://$ip/|" $tftpfile
 	$sed -i "s|http:///|http://$ip/|" $tfptfile
 
-	#---- Backup config.class.php and then update IP ----#
+    #---- Check docroot and webroot is set ----#
+    checkFogSettingVars "$docroot" "docroot" "$fogsettings" "$log"
+    checkFogSettingVars "$webroot" "docroot" "$fogsettings" "$log"
 
-	#check if docroot is blank.
-	if [[ -z $docroot ]]; then
-		$echo There is no docroot set inside $fogsettings exiting the script. >> $log
-		exit
-	fi
+    #---- Set config file location and check----#
+    configfile="${docroot}${webroot}lib/fog/config.class.php"
+    checkFilePresence "$configfile" "$log"
 
-	#check if webroot is blank.
-	if [[ -z $webroot ]]; then
-		$echo There is no webroot set inside $fogsettings exiting the script. >> $log
-		exit
-	fi
+	#---- Backup config.class.php ----#
+    $echo "Backing up $configfile" >> $log
+    $cp -f "$configfile" "${configfile}.old"
 
-
-
-	$echo Backing up ${docroot}$webroot'lib/fog/config.class.php' >> $log
-	$cp -f ${docroot}$webroot'lib/fog/config.class.php' ${docroot}$webroot'lib/fog/config.class.php.old'
-
-	$echo Updating the IP inside ${docroot}$webroot'lib/fog/config.class.php' >> $log
-	$sed -i "s|\".*\..*\..*\..*\"|\$_SERVER['SERVER_ADDR']|" ${docroot}$webroot'lib/fog/config.class.php'
+    #---- Update IP in config.class.php ----#
+    $echo "Updating the IP inside $configfile" >> $log
+    $sed -i "s|\".*\..*\..*\..*\"|\$_SERVER['SERVER_ADDR']|" $configfile
 
 	#---- Update .fogsettings IP ----#
+    $echo "Updating the ipaddress field inside of $fogsettings" >> $log
+    $sed -i "s|ipaddress='.*'|ipaddress='$ip'|g" $fogsettings
 
-	$echo Updating the ipaddress field inside of $fogsettings >> $log
-        $sed -i "s|ipaddress='.*'|ipaddress='$IP'|" $fogsettings
-
-
-	#check if customfogsettings exists, if not, create it.
+	# check if customfogsettings exists, if not, create it.
 	if [[ ! -f $customfogsettings ]]; then
 		$echo $customfogsettings was not found, creating it. >> $log
 		touch $customfogsettings
 	fi
 
+    if ! $grep -q dodnsmasq "$customfogsettings": then
+    fi
 
 	#Check if the dodnsmasq setting exists in $customfogsettings If not, create it and set it to true.
 	if ! $grep -q dodnsmasq "$customfogsettings"; then
@@ -274,4 +268,3 @@ else
 	$echo The IP address found on $interface matches the IP set in $fogsettings, assuming all is good, exiting. >> $log
 	exit
 fi
-

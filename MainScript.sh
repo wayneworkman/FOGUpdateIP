@@ -1,153 +1,51 @@
-#Fog settings location.
-fogsettings=/opt/fog/.fogsettings
+# Variable definitions
+## Custom configuration stuff
+[[ -z $fogsettings ]] && fogsettings="/opt/fog/.fogsettings"
+[[ -z $customfogsettings ]] && customfogsettings="/opt/fog/.fogsettings"
+## Log to write information to
+[[ -z $log ]] && log="/opt/fog/log/FOGUpdateIP.log"
+## Storage Node Name
+[[ -z $storageNode ]] && storageNode="DefaultMember"
 
-#Custom settings location.
-customfogsettings=/opt/fog/.fogsettings
+#---- Set Required Command Paths ----#
+grep=$(command -v grep)
+awk=$(command -v awk)
+cut=$(command -v cut)
+sed=$(command -v sed)
+mysql=$(command -v mysql)
+cp=$(command -v cp)
+echo=$(command -v echo)
+mv=$(command -v mv)
+rm=$(command -v rm)
+date=$(command -v date)
 
-#Log for this script, to store messages and such in.
-log=/opt/fog/log/FOGUpdateIP.log
+#---- Set non-required command paths ----#
+ip=$(command -v ip)
+systemctl=$(command -v systemctl)
 
-#This is the storage node's name that will be updated. If you have a custom name you can set it here.
-storageNode=DefaultMember
-
-
-#---- Set Command Paths ----#
-
-#Store previous contents of IFS.
-previousIFS=$IFS
-
-IFS=:
-  for p in $myPATHS; do
-	
-	#Get grep path
-	if [[ -f $p/grep ]]; then
-		grep=$p/grep
-	fi
-	
-	#Get awk path
-	if [[ -f $p/awk ]]; then
-		awk=$p/awk
-	fi
-	
-	#Get cut path
-	if [[ -f $p/cut ]]; then
-		cut=$p/cut
-	fi
-	
-	#Get ip path
-	if [[ -f $p/ip ]]; then
-		ip=$p/ip
-	fi
-
-	#Get sed path
-	if [[ -f $p/sed ]]; then
-		sed=$p/sed
-	fi
-
-	#Get mysql path
-	if [[ -f $p/mysql ]]; then
-		mysql=$p/mysql
-	fi
-
-	#Get cp path
-	if [[ -f $p/cp ]]; then
-		cp=$p/cp
-	fi
-
-	#Get echo path
-	if [[ -f $p/echo ]]; then
-		echo=$p/echo
-	fi
-	
-	#Get mv path
-	if [[ -f $p/mv ]]; then
-		mv=$p/mv
-	fi
-
-	#Get rm path
-	if [[ -f $p/rm ]]; then
-		rm=$p/rm
-	fi
-
-	#Get systemctl path
-	if [[ -f $p/systemctl ]]; then
-		systemctl=$p/systemctl
-	fi
-
-	#Get date path
-	if [[ -f $p/date ]]; then
-		date=$p/date
-	fi
-			
-  done
-
-#Restore previous contents of IFS
-IFS=$previousIFS
-
-
-#---- Check contents of command variables ----#
-	
-if [[ -z $echo ]]; then
-	echo The path for echo was not found, exiting. >> $log
-	exit
-fi
-
-if [[ -z $grep ]]; then
-        $echo The path for grep was not found, exiting. >> $log
-        exit
-fi
-
-if [[ -z $awk ]]; then
-	$echo The path for awk was not found, exiting. >> $log
-	exit
-fi
-
-if [[ -z $cut ]]; then
-	$echo The path for cut was not found, exiting. >> $log
-	exit
-fi
-
-if [[ -z $ip ]]; then
-	$echo The path for ip was not found, exiting. >> $log
-	exit
-fi
-
-if [[ -z $sed ]]; then
-	$echo The path for sed was not found, exiting. >> $log
-	exit
-fi
-
-if [[ -z $mysql ]]; then
-	$echo The path for mysql was not found, exiting. >> $log
-	exit
-fi
-
-if [[ -z $cp ]]; then
-	$echo The path for cp was not found, exiting. >> $log
-	exit
-fi
-
-if [[ -z $mv ]]; then
-	$echo The path for mv was not found, exiting. >> $log
-	exit
-fi
-
-if [[ -z $rm ]]; then
-	$echo The path for rm was not found, exiting. >> $log
-	exit
-fi
-
-if [[ -z $systemctl ]]; then
-	$echo The path for systemctl was not found, exiting. >> $log
-	exit
-fi
-
-if [[ -z $date ]]; then
-	$echo The path for date was not found, exiting. >> $log
-	exit
-fi
-
-
+# Function simply checks if the variable is defined.
+# Parameter 1 is the variable to check is set.
+# Parameter 2 is the message of what couldn't be found.
+# Parameter 3 is the log to send information to.
+checkCommand() {
+    local cmd="$1"
+    local msg="$2"
+    local log="$3"
+    if [[ -z $cmd ]]; then
+        echo "The path for $msg was not found, exiting" >> $log
+        exit 1
+    fi
+}
+#---- Check command variables required ----#
+checkCommand "$grep" "grep" "$log"
+checkCommand "$awk" "awk" "$log"
+checkCommand "$ip" "ip" "$log"
+checkCommand "$sed" "sed" "$log"
+checkCommand "$mysql" "mysql" "$log"
+checkCommand "$cp" "cp" "$log"
+checkCommand "$echo" "echo" "$log"
+checkCommand "$mv" "mv" "$log"
+checkCommand "$date" "date" "$log"
 
 #Record the date.
 NOW=$($date '+%d/%m/%Y %H:%M:%S')
@@ -201,17 +99,17 @@ done
 
 if [[ "$IP" != "$fogsettingsIP" ]]; then
 #If the interface IP doesn't match the .fogsettings IP, do the below.
-	
+
 
 	#-------------- Update the IP settings --------------#
-	
+
 	$echo The IP address for $interface does not match the ipaddress setting in $fogsettings, updating the IP Settings server-wide. >> $log
 
 	#---- SQL ----#
 
 	snmysqluser="$($grep 'snmysqluser=' $fogsettings | $cut -d \' -f2 )"
 	snmysqlpass="$($grep 'snmysqlpass=' $fogsettings | $cut -d \' -f2 )"
-	
+
 	#These are the SQL statements to run against the DB
 	statement1="UPDATE \`globalSettings\` SET \`settingValue\` = '$IP' WHERE \`settingKey\` ='FOG_TFTP_HOST';"
 	statement2="UPDATE \`globalSettings\` SET \`settingValue\` = '$IP' WHERE \`settingKey\` ='FOG_WOL_HOST';"
@@ -221,14 +119,14 @@ if [[ "$IP" != "$fogsettingsIP" ]]; then
 
 	#This puts all the statements into one variable. If you add more statments above, add the extra ones to this too.
 	sqlStatements=$statement1$statement2$statement3$statement4
-	
+
 
 	#This builds the proper MySQL Connection Statement and runs it.
 	if [ "$snmysqlpass" != "" ]; then
 		#If there is a password set
 		$echo A password was set for snmysqlpass in $fogsettings, using the password. >> $log
 		$mysql --user=$snmysqluser --password=$snmysqlpass --database='fog' -e "$sqlStatements"
-		
+
 	elif [ "$snmysqluser" != "" ]; then
 		#If there is a user set but no password
 		$echo A username was set for snmysqluser in $fogsettings, but no password was found. Using the username. >> $log
@@ -239,7 +137,7 @@ if [[ "$IP" != "$fogsettingsIP" ]]; then
 		#If there is no user or password set
 		$mysql --database='fog' -e "$sqlStatements"
 	fi
-	
+
 
 
 	#---- Update IP address in file default.ipxe ----#
@@ -250,7 +148,7 @@ if [[ "$IP" != "$fogsettingsIP" ]]; then
 
 
 	#---- Backup config.class.php and then updae IP ----#
-	
+
 	#read the docroot and webroot settings.
 	docroot="$($grep 'docroot=' $fogsettings | $cut -d \' -f2 )"
 	webroot="$($grep 'webroot=' $fogsettings | $cut -d \' -f2 )"
@@ -267,7 +165,7 @@ if [[ "$IP" != "$fogsettingsIP" ]]; then
 		$echo There is no webroot set inside $fogsettings exiting the script. >> $log
 		exit
 	fi
-	
+
 
 
 	$echo Backing up ${docroot}$webroot'lib/fog/config.class.php' >> $log
@@ -277,7 +175,7 @@ if [[ "$IP" != "$fogsettingsIP" ]]; then
 	$sed -i "s|\".*\..*\..*\..*\"|\$_SERVER['SERVER_ADDR']|" ${docroot}$webroot'lib/fog/config.class.php'
 
 	#---- Update .fogsettings IP ----#
-	
+
 	$echo Updating the ipaddress field inside of $fogsettings >> $log
         $sed -i "s|ipaddress='.*'|ipaddress='$IP'|" $fogsettings
 
@@ -300,7 +198,7 @@ if [[ "$IP" != "$fogsettingsIP" ]]; then
 		#Add a blank line at the end of customfogsettings.
 		$echo "" >> $customfogsettings
 	fi
-	
+
 
 	#Check if the bldnsmasq setting exists in $customfogsettings. If not, create it and set it to true.
 	if ! grep -q bldnsmasq "$customfogsettings"; then
@@ -314,7 +212,7 @@ if [[ "$IP" != "$fogsettingsIP" ]]; then
                 $echo "" >> $customfogsettings
 	fi
 
-	
+
 	#Read the dodnsmasq and bldnsmasq settings.
 	dodnsmasq="$($grep 'dodnsmasq=' $fogsettings | $cut -d \' -f2 )"
 	bldnsmasq="$($grep 'bldnsmasq=' $fogsettings | $cut -d \' -f2 )"
@@ -391,11 +289,11 @@ if [[ "$IP" != "$fogsettingsIP" ]]; then
 		$echo systemctl restart dnsmasq >> $log
 		$systemctl disable dnsmasq
 		$systemctl stop dnsmasq
-		
+
 	fi
 
 else
 	$echo The IP address found on $interface matches the IP set in $fogsettings, assuming all is good, exiting. >> $log
-	exit	
+	exit
 fi
 

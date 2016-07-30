@@ -1,6 +1,6 @@
 #---- README ----#
 This script is for changing the FOG Server's (Fog 1.3.0) IP address and for configuring dnsmasq automatically.
-It's intended to run as a cron event every 3 minutes, should work fine on Red Hat and RH variants.
+It's intended to run as a cron event every 3 minutes, should work fine on Red Hat 7, CentOS 7, and Fedora 19+.
 What this allows for is a 100% Mobile FOG 1.3.0 Server that uses pre-existing DHCP and will self-configure based on whatever IP the server recieves for use.
 
 Thanks to forums.fogproject.org @sudburr for doing the initial work.

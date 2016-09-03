@@ -9,7 +9,7 @@ packages="$(grep 'packages=' $fogsettings | cut -d \' -f2 )"
 #---- Check if FOG is installed ----#
 
 if [[ ! -f $fogsettings ]]; then
-        echo /opt/fog/.fogsettings file not found.
+        echo "$fogsettings file not found."
         echo Please install FOG first.
         exit
 fi
@@ -33,27 +33,32 @@ cp $currentDir/README $targetDir/README
 cp $currentDir/license.txt $targetDir/license.txt
 cp $currentDir/MainScript.sh $targetDir/FOGUpdateIP.sh
 
-#---- Add this system's $PATH contents to main script ----#
-
-echo " " | cat - $targetDir/FOGUpdateIP.sh > $targetDir/temp && mv $targetDir/temp $targetDir/FOGUpdateIP.sh
-echo myPATHS=$PATH | cat - $targetDir/FOGUpdateIP.sh > $targetDir/temp && mv $targetDir/temp $targetDir/FOGUpdateIP.sh
-echo '#Below is this systems PATH variable set as myPATHS' | cat - $targetDir/FOGUpdateIP.sh > $targetDir/temp && mv $targetDir/temp $targetDir/FOGUpdateIP.sh
 
 #make the main script executable.
 chmod +x $targetDir/FOGUpdateIP.sh
 
-#---- Add dnsmasq to packages list & Install dnsmasq ----#
 
-#Note this mearly makes sure it's installed and gets updated along with everything else.
-#If the dodnsmasq setting located in .fogsettings is not set to 1, then dnsmasq is never activated.
+#Check if dnsmasq is installed. If not, try to install it.
 
+dnsmasq=$(command -v dnsmasq)
 
-#if dnsmasq is not in the packages list, add it.
-if ! [[ $packages == *"dnsmasq"* ]]; then
-	sed -i -e 's/packages=" /packages=" dnsmasq /g' $fogsettings
+if [[ -z "$dnsmasq" ]]; then
+
+    yum=$(command -v yum)
+    dnf=$(command -v dnf)
+    aptget=$(command -v apt-get)
+
+    if [[ -z "$yum" ]]; then
+        yum install dnsmasq -y >/dev/null 2>&1
+    elif [[ -z "$dnf" ]]; then
+        dnf install dnsmasq -y >/dev/null 2>&1
+    elif [[ -z "$aptget" ]]; then
+        apt-get install dnsmasq -y >/dev/null 2>&1
+    else
+        echo "Could not find a repo manager to install dnsmasq, quitting."
+        exit 1
+    fi
 fi
-
-yum install dnsmasq -y >/dev/null 2>&1
 
 #---- Create the cron event ----#
 

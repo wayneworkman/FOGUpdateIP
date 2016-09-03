@@ -117,8 +117,14 @@ fi
 #---- Update the IP Setting ----#
 $echo "The IP Address for $interface does not match the ipaddress setting in $fogsettings, updating the IP Settings server-wide." >> $log
 statement1="UPDATE \`globalSettings\` SET \`settingValue\`='$ip' WHERE \`settingKey\` IN ('FOG_TFTP_HOST','FOG_WOL_HOST','FOG_WEB_HOST');"
-statement2="UPDATE \`nfsGroupMembers\` SET \`ngmHostname\`='$ip' WHERE \'ngmMemberName\`='$storageNode' OR \'ngmHostname\`='$ipaddress';"
+statement2="UPDATE \`nfsGroupMembers\` SET \`ngmHostname\`='$ip' WHERE \`ngmMemberName\`='$storageNode' OR \`ngmHostname\`='$ipaddress';"
 sqlStatements="$statement1$statement2"
+
+echo
+echo
+echo $sqlStatements
+echo
+echo
 
 # Builds proper SQL Statement and runs.
 # If no user defined, assume root
@@ -129,6 +135,11 @@ sqlStatements="$statement1$statement2"
 if [[ -z $snmysqlpass ]]; then
     $echo "A password was not set in $fogsettings for mysql use" >> $log
     $mysql -u"$snmysqluser" -e "$sqlStatements" "$database" 2>> $log
+
+echo $mysql
+echo $snmysqluser
+echo $database
+
     # Else run with password authentication
 else
     $echo "A password was set in $fogsettings for mysql use" >> $log

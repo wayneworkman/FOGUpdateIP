@@ -9,6 +9,7 @@
 [[ -z $database ]] && database="fog"
 [[ -z $tftpfile ]] && tftpfile="/tftpboot/default.ipxe"
 
+
 #---- Set Required Command Paths ----#
 grep=$(command -v grep)
 awk=$(command -v awk)
@@ -58,10 +59,9 @@ checkCommand "$basename" "basename" "$log"
 
 #Record the date.
 NOW=$($date '+%d/%m/%Y %H:%M:%S')
-$echo -------------------- >> $log
+$echo ---------------------------------------------- >> $log
 $echo $NOW >> $log
-$echo -------------------- >> $log
-
+$echo >> $log
 # Function checks if file is present.
 # Parameter 1 is the file to check for
 # Parameter 2 is the log to write to
@@ -120,12 +120,6 @@ statement1="UPDATE \`globalSettings\` SET \`settingValue\`='$ip' WHERE \`setting
 statement2="UPDATE \`nfsGroupMembers\` SET \`ngmHostname\`='$ip' WHERE \`ngmMemberName\`='$storageNode' OR \`ngmHostname\`='$ipaddress';"
 sqlStatements="$statement1$statement2"
 
-echo
-echo
-echo $sqlStatements
-echo
-echo
-
 # Builds proper SQL Statement and runs.
 # If no user defined, assume root
 [[ -z $snmysqluser ]] && $snmysqluser='root'
@@ -135,11 +129,6 @@ echo
 if [[ -z $snmysqlpass ]]; then
     $echo "A password was not set in $fogsettings for mysql use" >> $log
     $mysql -u"$snmysqluser" -e "$sqlStatements" "$database" 2>> $log
-
-echo $mysql
-echo $snmysqluser
-echo $database
-
     # Else run with password authentication
 else
     $echo "A password was set in $fogsettings for mysql use" >> $log
@@ -149,7 +138,7 @@ fi
 #---- Update IP address in file default.ipxe ----#
 $echo "Updating the IP in $tftpfile" >> $log
 $sed -i "s|http://\([^/]\+\)/|http://$ip/|" $tftpfile
-$sed -i "s|http:///|http://$ip/|" $tfptfile
+$sed -i "s|http:///|http://$ip/|" $tftpfile
 
 #---- Check docroot and webroot is set ----#
 checkFogSettingVars "$docroot" "docroot" "$fogsettings" "$log"
@@ -199,7 +188,7 @@ fi
 checkFogSettingVars "$dodnsmasq" 'dodnsmasq' "$fogsettings or $customfogsettings" "$log"
 checkFogSettingVars "$bldnsmasq" 'bldnsmasq' "$fogsettings or $customfogsettings" "$log"
 
-# Build dnsmasq ltsp file
+# if bldnsmasq is on, build conf file and setup boot file.
 if [[ $bldnsmasq -eq 1 ]]; then
     [[ -z $ltspfile ]] && ltspfile="/etc/dnsmasq.d/ltsp.conf"
     $echo "bldnsmasq inside $fogsettings or $customfogsettings was set to enabled, recreating $ltspfile" >> $log
@@ -210,7 +199,7 @@ if [[ $bldnsmasq -eq 1 ]]; then
         bootfilename="undionly.kkpxe"
     fi
     [[ -z $bootfilepath ]] && bootfilepath="/tftpboot/$bootfilename"
-    bootfileCopy="${bootfilename%.*}.0"
+    bootfileCopy="${bootfilepath%.*}.0"
     if [[ -f $bootfileCopy ]]; then
         $echo "$bootfileCopy was found, deleting it." >> $log
         $rm -f $bootfileCopy
@@ -222,30 +211,61 @@ if [[ $bldnsmasq -eq 1 ]]; then
     $echo "Recreating $ltspfile for use with dnsmasq." >> $log
     # backing up ltspfile
     $mv $ltspfile ${ltspfile}.backup
-    $echo -e "port=0\n \
-        log-dhcp\n \
-        tftp-root=$($dirname $bootfilepath)\n\
-        dhcp-boot=$($basename $bootfileCopy),$ip,$ip\n\
-        dhcp-option=17,$storageLocation\n\
-        dhcp-option=vendor:PXEClient,6,2b\n\
-        dhcp-no-override\n\
-        pxe-prompt=\"Press F8 for boot menu\",60\n\
-        pxe-service=X86PC,\"Boot from network\",$($basename $bootfilepath)\n\
-        pxe-service=X86PC,\"Boot from local hard disk\",0\n\
-        dhcp-range=$ip,proxy" > $ltspfile
+    $echo -e "#port=0\n\
+log-dhcp\n\
+tftp-root=$($dirname $bootfilepath)\n\
+dhcp-boot=$($basename $bootfileCopy),$ip,$ip\n\
+dhcp-option=17,$storageLocation\n\
+dhcp-option=vendor:PXEClient,6,2b\n\
+dhcp-no-override\n\
+pxe-prompt=\"Press F8 for boot menu\",60\n\
+pxe-service=X86PC,\"Boot from network\",$($basename $bootfilepath)\n\
+pxe-service=X86PC,\"Boot from local hard disk\",0\n\
+dhcp-range=$ip,proxy" > $ltspfile
 fi
+doDnsmasqService () {
+
+local dnsmasqOn=$1
+local systemctl=$(command -v systemctl)
+local service=$(command -v service)
+
+if [[ "$dnsmasqOn" -eq 0 ]]; then
+    if [[ -e "$systemctl" ]]; then
+        $systemctl stop dnsmasq >> $log
+        $systemctl disable dnsmasq >> $log
+    elif [[ -e "$service" ]]; then
+        $service dnsmasq stop >> $log
+        $service dnsmasq disable >> $log
+    else
+        echo "Could not disable dnsmasq." >> $log
+    fi
+elif [[ "$dnsmasqOn" -eq 1 ]]; then
+    if [[ -e "$systemctl" ]]; then
+        $systemctl start dnsmasq >> $log
+        $systemctl enable dnsmasq >> $log
+    elif [[ -e "$service" ]]; then
+        $service dnsmasq start >> $log
+        $service dnsmasq enable >> $log
+    else
+        echo "Could not enable dnsmasq." >> $log
+    fi
+fi
+}
+
 if [[ $dodnsmasq -eq 1 ]]; then
     $echo "dodnsmasq was enabled in either $fogsettings or $customfogsettings - starting dnsmasq/proxyDHCP and enabling to run at boot time." >> $log
     $echo "You may manually set this to 0 if you like, and manually stop/disable dnsmasq with these commands:" >> $log
-    $echo "systemctl disable dnsmasq" >> $log
-    $echo "systemctl stop dnsmasq" >> $log
-    $systemctl enable dnsmasq
-    $systemctl restart dnsmasq
+    doDnsmasqService 1
+    $echo "Debian:" >> $log
+    $echo "    service dnsmasq stop;service dnsmasq disable"
+    $echo "RHEL/Fedora/CentOS:"
+    $echo "    systemctl stop dnsmasq;systemctl disable dnsmasq"
 else
     $echo "dodnasmasq was disabled in either $fogsettings or $customfogsettings - stopping dnsmasq/proxyDHCP and disabling boot time startup." >> $log
     $echo "You may manually set this to 1 if you like, and manually start/enable dnsmasq with these commands:" >>$ log
-    $echo "systemctl enable dnsmasq" >> $log
-    $echo "systemctl restart dnsmasq" >> $log
-    $systemctl disable dnsmasq
-    $systemctl stop dnsmasq
+    doDnsmasqService 0
+    $echo "Debian:" >> $log
+    $echo "    service dnsmasq start;service dnsmasq enable"
+    $echo "RHEL/Fedora/CentOS:"
+    $echo "    systemctl start dnsmasq;systemctl enable dnsmasq"
 fi

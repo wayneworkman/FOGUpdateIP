@@ -42,17 +42,18 @@ chmod +x $targetDir/FOGUpdateIP.sh
 
 dnsmasq=$(command -v dnsmasq)
 
+
 if [[ -z "$dnsmasq" ]]; then
 
     yum=$(command -v yum)
     dnf=$(command -v dnf)
     aptget=$(command -v apt-get)
 
-    if [[ -z "$yum" ]]; then
+    if [[ -e "$yum" ]]; then
         yum install dnsmasq -y >/dev/null 2>&1
-    elif [[ -z "$dnf" ]]; then
+    elif [[ -e "$dnf" ]]; then
         dnf install dnsmasq -y >/dev/null 2>&1
-    elif [[ -z "$aptget" ]]; then
+    elif [[ -e "$aptget" ]]; then
         apt-get install dnsmasq -y >/dev/null 2>&1
     else
         echo "Could not find a repo manager to install dnsmasq, quitting."
@@ -65,5 +66,5 @@ fi
 crontab -l -u root | grep -v FOGUpdateIP.sh | crontab -u root -
 # */3 for every three minutes.
 newline="*/3 * * * * $targetDir/FOGUpdateIP.sh"
-(crontab -l -u root; echo "$newline") | crontab -
+(crontab -l -u root; echo "$newline") | crontab - >/dev/null 2>&1
 

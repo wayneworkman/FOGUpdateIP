@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # Variable definitions
 ## Custom configuration stuff
 [[ -z $fogsettings ]] && fogsettings="/opt/fog/.fogsettings"

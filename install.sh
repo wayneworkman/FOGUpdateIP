@@ -37,7 +37,6 @@ cp $currentDir/MainScript.sh $targetDir/FOGUpdateIP.sh
 #make the main script executable.
 chmod +x $targetDir/FOGUpdateIP.sh
 
-
 #Check if dnsmasq is installed. If not, try to install it.
 
 dnsmasq=$(command -v dnsmasq)

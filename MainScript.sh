@@ -256,16 +256,16 @@ if [[ $dodnsmasq -eq 1 ]]; then
     $echo "dodnsmasq was enabled in either $fogsettings or $customfogsettings - starting dnsmasq/proxyDHCP and enabling to run at boot time." >> $log
     $echo "You may manually set this to 0 if you like, and manually stop/disable dnsmasq with these commands:" >> $log
     doDnsmasqService 1
-    $echo "Debian:" >> $log
-    $echo "    service dnsmasq stop;service dnsmasq disable"
-    $echo "RHEL/Fedora/CentOS:"
-    $echo "    systemctl stop dnsmasq;systemctl disable dnsmasq"
+    $echo "Debian/Ubuntu:" >> $log
+    $echo "    service dnsmasq stop;service dnsmasq disable" >> $log
+    $echo "RHEL/Fedora/CentOS:" >> $log
+    $echo "    systemctl stop dnsmasq;systemctl disable dnsmasq" >> $log
 else
     $echo "dodnasmasq was disabled in either $fogsettings or $customfogsettings - stopping dnsmasq/proxyDHCP and disabling boot time startup." >> $log
     $echo "You may manually set this to 1 if you like, and manually start/enable dnsmasq with these commands:" >>$ log
     doDnsmasqService 0
-    $echo "Debian:" >> $log
-    $echo "    service dnsmasq start;service dnsmasq enable"
-    $echo "RHEL/Fedora/CentOS:"
-    $echo "    systemctl start dnsmasq;systemctl enable dnsmasq"
+    $echo "Debian/Ubuntu:" >> $log
+    $echo "    service dnsmasq start;service dnsmasq enable" >> $log
+    $echo "RHEL/Fedora/CentOS:" >> $log
+    $echo "    systemctl start dnsmasq;systemctl enable dnsmasq" >> $log
 fi
